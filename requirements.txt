@@ -16,6 +16,9 @@ opencv-python
 scenedetect
 pytesseract
 easyocr
+# moondream2 captioning (optional alternative to OCR)
+transformers
+einops
 
 # Summarization (M5) — talks to local Ollama server
 ollama
