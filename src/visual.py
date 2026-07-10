@@ -99,14 +99,24 @@ def analyze_video(video_path: Path, mode: str = "ocr") -> list[dict]:
 
     describe = ocr_frame if mode == "ocr" else caption_frame
 
+    timestamps = detect_keyframes(video_path)
     notes = []
-    for ts in detect_keyframes(video_path):
+    unreadable = 0
+    for ts in timestamps:
         frame = grab_frame(video_path, ts)
         if frame is None:
+            unreadable += 1
             continue
         description = describe(frame)
         if description:
             notes.append({"timestamp": ts, "description": description})
+
+    if timestamps and unreadable == len(timestamps):
+        raise RuntimeError(
+            f"Could not read any frames from {video_path} (all {unreadable} keyframe(s) "
+            "unreadable). This usually means opencv's ffmpeg build can't decode this "
+            "video's codec (e.g. AV1) — try re-downloading with a different format."
+        )
     return notes
 
 

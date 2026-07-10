@@ -15,7 +15,14 @@ def download_video(url: str, out_dir: Path) -> Path:
     """Download a video via yt-dlp, return the path to the downloaded file."""
     out_dir.mkdir(parents=True, exist_ok=True)
     ydl_opts = {
-        "format": "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
+        # Prefer H.264 (avc1): opencv's bundled ffmpeg (used by the visual module for
+        # frame grabbing) can't decode AV1/VP9 on this build, even though the system
+        # ffmpeg used for audio extraction handles them fine.
+        "format": (
+            "bestvideo[vcodec^=avc1][height<=720]+bestaudio/"
+            "best[vcodec^=avc1][height<=720]/"
+            "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
+        ),
         "outtmpl": str(out_dir / "%(id)s.%(ext)s"),
         "merge_output_format": "mp4",
         "quiet": True,
