@@ -1,0 +1,21 @@
+# Video Understanding pipeline — local/open-source only, see CLAUDE.md
+
+# Ingestion
+yt-dlp
+
+# Transcription (M2)
+faster-whisper
+ctranslate2
+
+# Visual module (M3, optional)
+opencv-python
+scenedetect
+pytesseract
+easyocr
+
+# Summarization (M5) — talks to local Ollama server
+ollama
+
+# General
+numpy
+tqdm
