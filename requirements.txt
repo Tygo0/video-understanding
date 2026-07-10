@@ -1,0 +1,28 @@
+# Video Understanding pipeline — local/open-source only, see CLAUDE.md
+
+# Ingestion
+yt-dlp
+
+# Transcription (M2)
+faster-whisper
+ctranslate2
+# ctranslate2 links against CUDA 12's cuBLAS/cuDNN; pin these explicitly since
+# torch's own CUDA 13 deps would otherwise shadow them (see src/transcribe.py)
+nvidia-cublas-cu12
+nvidia-cudnn-cu12
+
+# Visual module (M3, optional)
+opencv-python
+scenedetect
+pytesseract
+easyocr
+# moondream2 captioning (optional alternative to OCR)
+transformers
+einops
+
+# Summarization (M5) — talks to local Ollama server
+ollama
+
+# General
+numpy
+tqdm

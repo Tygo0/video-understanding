@@ -1,0 +1,9 @@
+CLAUDE.md
+venv/
+__pycache__/
+*.pyc
+outputs/*
+!outputs/.gitkeep
+.env
+*.wav
+*.mp4
