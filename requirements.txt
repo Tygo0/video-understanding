@@ -23,6 +23,9 @@ einops
 # Summarization (M5) — talks to local Ollama server
 ollama
 
+# Translation (optional --target-language flag): NLLB-200, not the summarization LLM
+sentencepiece
+
 # General
 numpy
 tqdm

@@ -16,6 +16,7 @@ from src.summarize import DEFAULT_MODEL as DEFAULT_SUMMARY_MODEL
 from src.summarize import summarize_chunks
 from src.transcribe import DEFAULT_MODEL_SIZE as DEFAULT_WHISPER_MODEL
 from src.transcribe import transcribe
+from src.translate import NLLB_LANGUAGE_CODES, translate
 from src.visual import analyze_video
 
 
@@ -30,6 +31,9 @@ def parse_args() -> argparse.Namespace:
                          help="faster-whisper model size (default: %(default)s)")
     parser.add_argument("--summary-model", default=DEFAULT_SUMMARY_MODEL,
                          help="Ollama model for summarization (default: %(default)s)")
+    parser.add_argument("--target-language", default="en", choices=sorted(NLLB_LANGUAGE_CODES),
+                         help="Translate the final summary into this language via NLLB-200 "
+                              "(default: %(default)s, i.e. no translation)")
     parser.add_argument("--output-dir", default="outputs",
                          help="Base output directory (default: %(default)s)")
     return parser.parse_args()
@@ -40,40 +44,51 @@ def run(args: argparse.Namespace) -> Path:
     run_dir = Path(args.output_dir) / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"[1/6] Ingesting {args.input!r}...")
+    print(f"[1/7] Ingesting {args.input!r}...")
     video_path = ingest(args.input, run_dir / "video")
 
-    print("[2/6] Extracting audio...")
+    print("[2/7] Extracting audio...")
     wav_path = extract_audio(video_path, run_dir / "audio.wav")
 
-    print(f"[3/6] Transcribing (faster-whisper: {args.whisper_model})...")
+    print(f"[3/7] Transcribing (faster-whisper: {args.whisper_model})...")
     segments, transcript_language = transcribe(wav_path, model_size=args.whisper_model)
     print(f"      Detected language: {transcript_language}")
     (run_dir / "transcript.json").write_text(json.dumps(segments, indent=2, ensure_ascii=False))
 
     visual_notes = None
     if args.visual == "on":
-        print(f"[4/6] Analyzing visuals (mode: {args.visual_mode})...")
+        print(f"[4/7] Analyzing visuals (mode: {args.visual_mode})...")
         visual_notes = analyze_video(video_path, mode=args.visual_mode)
         (run_dir / "visual.json").write_text(json.dumps(visual_notes, indent=2, ensure_ascii=False))
     else:
-        print("[4/6] Visual module disabled, skipping.")
+        print("[4/7] Visual module disabled, skipping.")
 
-    print("[5/6] Merging + chunking...")
+    print("[5/7] Merging + chunking...")
     events = merge_timeline(segments, visual_notes)
     chunks = chunk_to_text(events)
     print(f"      {len(chunks)} chunk(s) from {len(events)} event(s)")
 
-    print(f"[6/6] Summarizing (Ollama: {args.summary_model})...")
+    print(f"[6/7] Summarizing (Ollama: {args.summary_model})...")
     result = summarize_chunks(chunks, model=args.summary_model)
     (run_dir / "chunk_summaries.json").write_text(
         json.dumps(result["chunk_summaries"], indent=2, ensure_ascii=False)
     )
     (run_dir / "summary.txt").write_text(result["final_summary"])
 
+    if args.target_language != "en":
+        print(f"[7/7] Translating summary to {args.target_language!r} (NLLB-200)...")
+        translated_summary = translate(result["final_summary"], args.target_language)
+        (run_dir / f"summary_{args.target_language}.txt").write_text(translated_summary)
+    else:
+        print("[7/7] Translation not requested (--target-language en), skipping.")
+        translated_summary = None
+
     print(f"\nDone. Outputs saved to {run_dir}/")
     print("\n=== Summary ===")
     print(result["final_summary"])
+    if translated_summary:
+        print(f"\n=== Summary ({args.target_language}) ===")
+        print(translated_summary)
 
     return run_dir
 
