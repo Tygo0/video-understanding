@@ -47,7 +47,8 @@ def run(args: argparse.Namespace) -> Path:
     wav_path = extract_audio(video_path, run_dir / "audio.wav")
 
     print(f"[3/6] Transcribing (faster-whisper: {args.whisper_model})...")
-    segments = transcribe(wav_path, model_size=args.whisper_model)
+    segments, transcript_language = transcribe(wav_path, model_size=args.whisper_model)
+    print(f"      Detected language: {transcript_language}")
     (run_dir / "transcript.json").write_text(json.dumps(segments, indent=2, ensure_ascii=False))
 
     visual_notes = None

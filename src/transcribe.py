@@ -34,19 +34,28 @@ def transcribe(
     model_size: str = DEFAULT_MODEL_SIZE,
     device: str = "cuda",
     compute_type: str = "float16",
-) -> list[dict]:
-    """Transcribe audio_path, returning a list of {start, end, text} segments."""
+    task: str = "translate",
+) -> tuple[list[dict], str]:
+    """Transcribe audio_path, returning ({start, end, text} segments, detected language code).
+
+    task="translate" (default) has Whisper translate non-English speech directly to
+    English text, so downstream summarization always works in English regardless of
+    the source language — Qwen's instruction-following for non-English output
+    (e.g. "respond in Turkish") is not reliable at this model size/quantization.
+    Pass task="transcribe" to keep the source language instead.
+    """
     model = WhisperModel(model_size, device=device, compute_type=compute_type)
-    segments, _info = model.transcribe(str(audio_path), beam_size=5)
-    return [
+    segments, info = model.transcribe(str(audio_path), beam_size=5, task=task)
+    segment_list = [
         {"start": round(seg.start, 2), "end": round(seg.end, 2), "text": seg.text.strip()}
         for seg in segments
     ]
+    return segment_list, info.language
 
 
 def transcribe_to_json(audio_path: Path, out_path: Path, **kwargs) -> Path:
     """Transcribe audio_path and write the segment list as JSON to out_path."""
-    segments = transcribe(audio_path, **kwargs)
+    segments, _language = transcribe(audio_path, **kwargs)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(segments, indent=2, ensure_ascii=False))
     return out_path
