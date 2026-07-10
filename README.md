@@ -10,15 +10,16 @@ video/URL --> audio (ffmpeg) --> transcript (faster-whisper)
                                \
                                 +--> visual notes (PySceneDetect + OCR/captioning) [optional]
                                /
-        merge (timeline) --> chunk (~1800 tokens) --> summarize (Ollama, map-reduce)
+        merge (timeline) --> chunk (~1800 tokens) --> summarize (Ollama, map-reduce) --> translate [optional]
 ```
 
 1. **Ingest** — accept a local video path or a URL (downloaded via `yt-dlp`)
 2. **Audio extraction** — 16kHz mono WAV via `ffmpeg`
-3. **Transcription** — `faster-whisper` (medium, float16, GPU) → `{start, end, text}` segments
+3. **Transcription** — `faster-whisper` (medium, float16, GPU), translating non-English speech directly to English text → `{start, end, text}` segments
 4. **Visual module** *(optional)* — scene detection (`PySceneDetect`) + keyframe OCR (`EasyOCR`) or captioning (`moondream2`)
 5. **Merge + chunk** — interleave transcript and visual notes by timestamp, split into ~1800-token chunks on segment boundaries
-6. **Summarize** — map-reduce summarization via a local Ollama model (`qwen2.5:7b-instruct-q4_K_M`)
+6. **Summarize** — map-reduce summarization via a local Ollama model (`qwen2.5:7b-instruct-q4_K_M`), English only
+7. **Translate** *(optional)* — translate the final summary into another language via a dedicated model (`NLLB-200`)
 
 ## Requirements
 
@@ -61,16 +62,18 @@ Options:
 | `--visual-mode` | `ocr` | `ocr` (EasyOCR) or `caption` (moondream2), only used with `--visual on` |
 | `--whisper-model` | `medium` | `faster-whisper` model size |
 | `--summary-model` | `qwen2.5:7b-instruct-q4_K_M` | Ollama model for summarization |
+| `--target-language` | `en` | Translate the final summary into this language (e.g. `tr`); `en` skips translation |
 | `--output-dir` | `outputs` | Base directory for run outputs |
 
 Each run writes to `outputs/<run_id>/`:
 
 - `video/` — downloaded or copied source video
 - `audio.wav` — extracted audio
-- `transcript.json` — `{start, end, text}` segments
+- `transcript.json` — `{start, end, text}` segments (English, translated from the source language if needed)
 - `visual.json` — `{timestamp, description}` notes (if `--visual on`)
-- `chunk_summaries.json` — per-chunk summaries
-- `summary.txt` — final overall summary
+- `chunk_summaries.json` — per-chunk summaries (English)
+- `summary.txt` — final overall summary (English)
+- `summary_<lang>.txt` — translated summary (if `--target-language` is set to something other than `en`)
 
 ## Project layout
 
@@ -82,8 +85,9 @@ src/
 ├── visual.py         # video -> scene/keyframe OCR or captions
 ├── merge.py           # transcript + visual notes -> one timestamped timeline
 ├── chunk.py             # timeline -> token-sized chunks
-├── summarize.py          # chunks -> map-reduce summary (Ollama)
-└── pipeline.py             # CLI entrypoint wiring all of the above
+├── summarize.py          # chunks -> map-reduce summary (Ollama), English only
+├── translate.py            # English summary -> target language (NLLB-200), optional
+└── pipeline.py               # CLI entrypoint wiring all of the above
 scripts/
 └── check_env.py    # environment acceptance check (ffmpeg, GPU, Ollama)
 ```
@@ -102,3 +106,11 @@ scripts/
 - **Scene detection threshold is tuned for slide/text content** (low-contrast,
   mostly-static backgrounds). Real-world footage with lots of camera motion may
   need a higher `ContentDetector` threshold than the current default.
+- **Summarization only works reliably in English.** `qwen2.5:7b-instruct-q4_K_M`'s
+  instruction-following for non-English output is unreliable at this size/
+  quantization — it drifted into the wrong language entirely when asked to
+  summarize non-English text, and produced real mistranslation errors even when
+  asked to just translate. Non-English speech is translated to English at the
+  transcription stage (`faster-whisper`'s `task="translate"`) so summarization
+  always has reliable English input; `--target-language` then translates the
+  final summary via a dedicated model (NLLB-200) instead of the LLM.
