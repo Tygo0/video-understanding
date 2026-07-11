@@ -29,6 +29,13 @@ def _generate(prompt: str, model: str) -> str:
     return response["response"].strip()
 
 
+def unload_model(model: str = DEFAULT_MODEL) -> None:
+    """Ask the Ollama server to immediately unload `model` from RAM/VRAM, instead of
+    waiting out its default ~5 minute idle keep_alive. Call this once summarization
+    is done and no further chunks/final-reduce calls are coming."""
+    ollama.generate(model=model, prompt="", keep_alive=0)
+
+
 def summarize_chunk(chunk_text: str, model: str = DEFAULT_MODEL) -> str:
     return _generate(CHUNK_PROMPT.format(chunk_text=chunk_text), model=model)
 

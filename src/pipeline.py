@@ -13,7 +13,7 @@ from src.chunk import chunk_to_text
 from src.ingest import ingest
 from src.merge import merge_timeline
 from src.summarize import DEFAULT_MODEL as DEFAULT_SUMMARY_MODEL
-from src.summarize import summarize_chunks
+from src.summarize import summarize_chunks, unload_model
 from src.transcribe import DEFAULT_MODEL_SIZE as DEFAULT_WHISPER_MODEL
 from src.transcribe import transcribe
 from src.translate import NLLB_LANGUAGE_CODES, translate
@@ -76,6 +76,9 @@ def run(args: argparse.Namespace) -> Path:
     (run_dir / "summary.txt").write_text(result["final_summary"])
 
     if args.target_language != "en":
+        # Release the Ollama model before loading NLLB, rather than leaving both
+        # resident at once for the rest of Ollama's default ~5 minute keep_alive.
+        unload_model(args.summary_model)
         print(f"[7/7] Translating summary to {args.target_language!r} (NLLB-200)...")
         translated_summary = translate(result["final_summary"], args.target_language)
         (run_dir / f"summary_{args.target_language}.txt").write_text(translated_summary)
